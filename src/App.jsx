@@ -50,6 +50,7 @@ export default function App() {
   const [activeZekrId, setActiveZekrId] = useLocalStorage('active_zekr_v1', DEFAULT_ZEKRS[0].id);
   
   const [isListening, setIsListening] = useState(false);
+  const isListeningRef = useRef(false);
   const [lastHeard, setLastHeard] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [popCounter, setPopCounter] = useState(false);
@@ -102,6 +103,7 @@ export default function App() {
 
     recognition.onstart = () => {
       setIsListening(true);
+      isListeningRef.current = true;
       setErrorMsg('');
       if ('wakeLock' in navigator) {
         navigator.wakeLock.request('screen').catch(console.error);
@@ -185,6 +187,7 @@ export default function App() {
     recognition.onerror = (event) => {
       console.error("Speech error:", event.error);
       setIsListening(false);
+      isListeningRef.current = false;
       if (event.error === 'not-allowed') {
         setErrorMsg("المتصفح يمنع المايكروفون. يرجى السماح بالوصول.");
       } else {
@@ -193,7 +196,7 @@ export default function App() {
     };
 
     recognition.onend = () => {
-      if (isListening) {
+      if (isListeningRef.current) {
         try { recognition.start(); } catch(e) { /* Ignore */ }
       } else {
         setIsListening(false);
@@ -201,13 +204,16 @@ export default function App() {
     };
 
     return recognition;
-  }, [activeZekr, isListening, updateCount]);
+  }, [activeZekr, updateCount]);
 
   const toggleListening = () => {
-    if (isListening) {
+    if (isListeningRef.current) {
       setIsListening(false);
+      isListeningRef.current = false;
       if (recognitionRef.current) recognitionRef.current.stop();
     } else {
+      setIsListening(true);
+      isListeningRef.current = true;
       const rec = initRecognition();
       if (rec) {
         recognitionRef.current = rec;
