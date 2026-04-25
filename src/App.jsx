@@ -12,15 +12,18 @@ function useLocalStorage(key, initialValue) {
     }
   });
 
-  const setValue = (value) => {
+  const setValue = useCallback((value) => {
     try {
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      setStoredValue(valueToStore);
-      window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      setStoredValue(prev => {
+        const valueToStore = value instanceof Function ? value(prev) : value;
+        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        return valueToStore;
+      });
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [key]);
+
   return [storedValue, setValue];
 }
 
@@ -37,7 +40,8 @@ function normalizeArabic(text) {
   return text.replace(/[أإآ]/g, 'ا')
              .replace(/ة/g, 'ه')
              .replace(/ى/g, 'ي')
-             .replace(/[\u064B-\u065F\u0651\u0654]/g, '')
+             .replace(/[\u064B-\u065F\u0651\u0654\u0670]/g, '')
+             .replace(/\s+/g, ' ')
              .trim();
 }
 
@@ -61,6 +65,11 @@ export default function App() {
   
   const recognitionRef = useRef(null);
   const activeZekr = zekrs.find(z => z.id === activeZekrId) || zekrs[0];
+  
+  const activeZekrRef = useRef(activeZekr);
+  useEffect(() => {
+    activeZekrRef.current = activeZekr;
+  }, [activeZekr]);
 
   const updateCount = useCallback((increment) => {
     setZekrs(prev => prev.map(z => {
@@ -101,29 +110,70 @@ export default function App() {
 
     recognition.onresult = (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript;
-      setLastHeard(transcript);
+      setLastHeard(transcript.trim());
       
       const normalizedTranscript = normalizeArabic(transcript);
-      const targets = activeZekr.phrases.map(normalizeArabic);
+      const currentZekr = activeZekrRef.current;
       
+      // Remove duplicates and sort by length descending to match longest phrases first
+      const targets = [...new Set(currentZekr.phrases.map(normalizeArabic))]
+                      .filter(p => p.length > 0)
+                      .sort((a, b) => b.length - a.length);
+      
+      let textToSearch = normalizedTranscript;
       let newMatches = 0;
-      for (let target of targets) {
-        if (!target) continue;
-        const occurrences = normalizedTranscript.split(target).length - 1;
-        if (occurrences > 0) {
-          newMatches += occurrences;
+      
+      while (true) {
+        let earliestIndex = -1;
+        let bestMatch = "";
+
+        for (let target of targets) {
+          const index = textToSearch.indexOf(target);
+          if (index !== -1) {
+            if (earliestIndex === -1 || index < earliestIndex) {
+              earliestIndex = index;
+              bestMatch = target;
+            } else if (index === earliestIndex && target.length > bestMatch.length) {
+              bestMatch = target;
+            }
+          }
+        }
+
+        if (earliestIndex !== -1) {
+          newMatches++;
+          textToSearch = textToSearch.substring(earliestIndex + bestMatch.length);
+        } else {
+          break;
         }
       }
-      
+
+      // Fallback for clumped words without spaces (e.g. "استغفرالله")
       if (newMatches === 0) {
-        const words = normalizedTranscript.split(/\s+/);
-        for(let target of targets) {
-             const targetWords = target.split(/\s+/);
-             if(targetWords.length === 1) {
-                 for(let w of words) {
-                     if(w === target) newMatches++;
-                 }
-             }
+        let spacelessText = normalizedTranscript.replace(/\s/g, '');
+        // Only consider targets > 3 characters to avoid short false positives like "الله" inside "اللهم"
+        let spacelessTargets = targets.map(t => t.replace(/\s/g, '')).filter(t => t.length > 3);
+        
+        while (true) {
+          let earliestIndex = -1;
+          let bestMatch = "";
+          for (let target of spacelessTargets) {
+            const index = spacelessText.indexOf(target);
+            if (index !== -1) {
+              if (earliestIndex === -1 || index < earliestIndex) {
+                earliestIndex = index;
+                bestMatch = target;
+              } else if (index === earliestIndex && target.length > bestMatch.length) {
+                bestMatch = target;
+              }
+            }
+          }
+
+          if (earliestIndex !== -1) {
+            newMatches++;
+            spacelessText = spacelessText.substring(earliestIndex + bestMatch.length);
+          } else {
+            break;
+          }
         }
       }
 
