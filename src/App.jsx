@@ -186,6 +186,12 @@ export default function App() {
 
     recognition.onerror = (event) => {
       console.error("Speech error:", event.error);
+      
+      // Ignore non-fatal timeout/network errors so onend can automatically restart it
+      if (event.error === 'no-speech' || event.error === 'network' || event.error === 'aborted') {
+        return;
+      }
+
       setIsListening(false);
       isListeningRef.current = false;
       if (event.error === 'not-allowed') {
