@@ -54,6 +54,7 @@ export default function App() {
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [newZekrName, setNewZekrName] = useState('');
   const [newZekrPhrases, setNewZekrPhrases] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: '', onConfirm: null, isAlert: false });
   
   const recognitionRef = useRef(null);
   const activeZekr = zekrs.find(z => z.id === activeZekrId) || zekrs[0];
@@ -163,15 +164,26 @@ export default function App() {
   };
 
   const resetCount = () => {
-    if (confirm("هل أنت متأكد من تصفير العداد؟")) {
-      setZekrs(prev => prev.map(z => z.id === activeZekrId ? { ...z, count: 0 } : z));
-      setLastHeard("");
-    }
+    setConfirmDialog({
+      isOpen: true,
+      message: "هل أنت متأكد من تصفير العداد؟",
+      isAlert: false,
+      onConfirm: () => {
+        setZekrs(prev => prev.map(z => z.id === activeZekrId ? { ...z, count: 0 } : z));
+        setLastHeard("");
+        setConfirmDialog({ isOpen: false, message: '', onConfirm: null, isAlert: false });
+      }
+    });
   };
 
   const handleAddZekr = () => {
     if (!newZekrName.trim() || !newZekrPhrases.trim()) {
-      alert("الرجاء إدخال اسم الذكر والعبارات المستهدفة.");
+      setConfirmDialog({
+        isOpen: true,
+        message: "الرجاء إدخال اسم الذكر والعبارات المستهدفة.",
+        isAlert: true,
+        onConfirm: () => setConfirmDialog({ isOpen: false, message: '', onConfirm: null, isAlert: false })
+      });
       return;
     }
     
@@ -190,16 +202,27 @@ export default function App() {
 
   const handleDeleteZekr = (id) => {
     if (zekrs.length <= 1) {
-      alert("لا يمكن حذف الذكر الوحيد المتبقي.");
+      setConfirmDialog({
+        isOpen: true,
+        message: "لا يمكن حذف الذكر الوحيد المتبقي.",
+        isAlert: true,
+        onConfirm: () => setConfirmDialog({ isOpen: false, message: '', onConfirm: null, isAlert: false })
+      });
       return;
     }
-    if (confirm("هل أنت متأكد من حذف هذا الذكر من القائمة؟")) {
-      setZekrs(prev => prev.filter(z => z.id !== id));
-      if (activeZekrId === id) {
-        const remaining = zekrs.filter(z => z.id !== id);
-        setActiveZekrId(remaining[0].id);
+    setConfirmDialog({
+      isOpen: true,
+      message: "هل أنت متأكد من حذف هذا الذكر من القائمة؟",
+      isAlert: false,
+      onConfirm: () => {
+        setZekrs(prev => prev.filter(z => z.id !== id));
+        if (activeZekrId === id) {
+          const remaining = zekrs.filter(z => z.id !== id);
+          setActiveZekrId(remaining[0].id);
+        }
+        setConfirmDialog({ isOpen: false, message: '', onConfirm: null, isAlert: false });
       }
-    }
+    });
   };
 
   useEffect(() => {
@@ -298,6 +321,44 @@ export default function App() {
         </div>
       </div>
       
+      {/* Custom Confirm Modal */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl text-center transform transition-all duration-300 scale-100">
+            <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="fas fa-exclamation-triangle text-3xl"></i>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">تنبيه</h3>
+            <p className="text-slate-300 mb-8 text-sm leading-relaxed">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              {confirmDialog.isAlert ? (
+                <button 
+                  onClick={confirmDialog.onConfirm}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-4 rounded-xl transition-colors"
+                >
+                  حسناً
+                </button>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => setConfirmDialog({ isOpen: false, message: '', onConfirm: null, isAlert: false })}
+                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-4 rounded-xl transition-colors"
+                  >
+                    إلغاء
+                  </button>
+                  <button 
+                    onClick={confirmDialog.onConfirm}
+                    className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-red-600/20"
+                  >
+                    تأكيد
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Manage Zekr Modal */}
       {isManageModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
