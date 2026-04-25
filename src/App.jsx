@@ -55,6 +55,9 @@ export default function App() {
   const [newZekrName, setNewZekrName] = useState('');
   const [newZekrPhrases, setNewZekrPhrases] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: '', onConfirm: null, isAlert: false });
+  const [editingZekrId, setEditingZekrId] = useState(null);
+  const [editZekrName, setEditZekrName] = useState('');
+  const [editZekrPhrases, setEditZekrPhrases] = useState('');
   
   const recognitionRef = useRef(null);
   const activeZekr = zekrs.find(z => z.id === activeZekrId) || zekrs[0];
@@ -223,6 +226,43 @@ export default function App() {
         setConfirmDialog({ isOpen: false, message: '', onConfirm: null, isAlert: false });
       }
     });
+  };
+
+  const handleEditZekrInit = (zekr) => {
+    setEditingZekrId(zekr.id);
+    setEditZekrName(zekr.name);
+    setEditZekrPhrases(zekr.phrases.join(' - '));
+  };
+
+  const handleEditZekrCancel = () => {
+    setEditingZekrId(null);
+    setEditZekrName('');
+    setEditZekrPhrases('');
+  };
+
+  const handleEditZekrSave = () => {
+    if (!editZekrName.trim() || !editZekrPhrases.trim()) {
+      setConfirmDialog({
+        isOpen: true,
+        message: "الرجاء إدخال اسم الذكر والعبارات المستهدفة.",
+        isAlert: true,
+        onConfirm: () => setConfirmDialog({ isOpen: false, message: '', onConfirm: null, isAlert: false })
+      });
+      return;
+    }
+
+    setZekrs(prev => prev.map(z => {
+      if (z.id === editingZekrId) {
+        return {
+          ...z,
+          name: editZekrName.trim(),
+          phrases: editZekrPhrases.split('-').map(p => p.trim()).filter(p => p)
+        };
+      }
+      return z;
+    }));
+    
+    setEditingZekrId(null);
   };
 
   useEffect(() => {
@@ -397,15 +437,56 @@ export default function App() {
               <h3 className="text-slate-300 font-bold mb-4 text-sm">الأذكار المحفوظة</h3>
               <div className="space-y-3">
                 {zekrs.map(zekr => (
-                  <div key={zekr.id} className="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-700/50">
-                    <span className="font-bold text-sm text-slate-200">{zekr.name}</span>
-                    <button 
-                      onClick={() => handleDeleteZekr(zekr.id)}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-400/10 p-2 rounded-lg transition-colors"
-                      title="حذف الذكر"
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
+                  <div key={zekr.id} className="flex flex-col bg-slate-900 p-3 rounded-xl border border-slate-700/50">
+                    {editingZekrId === zekr.id ? (
+                      <div className="flex flex-col gap-2">
+                        <input 
+                          type="text" 
+                          className="w-full bg-slate-800 text-white border border-slate-600 rounded-lg p-2 focus:outline-none focus:border-emerald-500 text-sm"
+                          value={editZekrName}
+                          onChange={(e) => setEditZekrName(e.target.value)}
+                        />
+                        <textarea 
+                          className="w-full bg-slate-800 text-white border border-slate-600 rounded-lg p-2 focus:outline-none focus:border-emerald-500 text-sm h-16 resize-none"
+                          value={editZekrPhrases}
+                          onChange={(e) => setEditZekrPhrases(e.target.value)}
+                        ></textarea>
+                        <div className="flex justify-end gap-2 mt-2">
+                          <button 
+                            onClick={handleEditZekrCancel}
+                            className="bg-slate-700 hover:bg-slate-600 text-white py-1 px-3 rounded-lg text-xs font-bold transition-colors"
+                          >
+                            إلغاء
+                          </button>
+                          <button 
+                            onClick={handleEditZekrSave}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white py-1 px-3 rounded-lg text-xs font-bold transition-colors"
+                          >
+                            حفظ
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-center w-full">
+                        <span className="font-bold text-sm text-slate-200">{zekr.name}</span>
+                        <div className="flex gap-1">
+                          <button 
+                            onClick={() => handleEditZekrInit(zekr)}
+                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 p-2 rounded-lg transition-colors"
+                            title="تعديل الذكر"
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteZekr(zekr.id)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-400/10 p-2 rounded-lg transition-colors"
+                            title="حذف الذكر"
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
