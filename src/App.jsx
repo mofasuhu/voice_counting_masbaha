@@ -315,6 +315,55 @@ export default function App() {
     setEditingZekrId(null);
   };
 
+  const handleExportData = () => {
+    const dataStr = JSON.stringify(zekrs, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `masbaha_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        if (Array.isArray(importedData) && importedData.length > 0 && importedData[0].id) {
+          setConfirmDialog({
+            isOpen: true,
+            message: "هل أنت متأكد من استبدال بياناتك الحالية بالبيانات المستوردة؟ لا يمكن التراجع عن هذه الخطوة.",
+            isAlert: false,
+            onConfirm: () => {
+              setZekrs(importedData);
+              setActiveZekrId(importedData[0].id);
+              setConfirmDialog({ isOpen: false, message: '', onConfirm: null, isAlert: false });
+              setIsManageModalOpen(false);
+            }
+          });
+        } else {
+          throw new Error("Invalid format");
+        }
+      } catch (error) {
+        setConfirmDialog({
+          isOpen: true,
+          message: "حدث خطأ أثناء قراءة الملف. تأكد من أنه ملف نسخ احتياطي صحيح (JSON).",
+          isAlert: true,
+          onConfirm: () => setConfirmDialog({ isOpen: false, message: '', onConfirm: null, isAlert: false })
+        });
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = null;
+  };
+
   useEffect(() => {
     if (isListening && recognitionRef.current) {
       recognitionRef.current.stop();
@@ -327,16 +376,19 @@ export default function App() {
       <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-emerald-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
       <div className="absolute bottom-[-10%] left-[-10%] w-64 h-64 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
 
-      <header className="text-center z-10 mb-8 mt-4 relative">
+      <header className="z-10 mb-8 mt-4 w-full flex items-start">
         <button 
           onClick={() => setIsManageModalOpen(true)}
-          className="absolute left-0 top-0 text-slate-400 hover:text-white p-2"
+          className="text-slate-400 hover:text-emerald-400 transition-colors p-2 shrink-0 w-12"
           title="إدارة الأذكار"
         >
-          <i className="fas fa-cog text-xl"></i>
+          <i className="fas fa-cog text-2xl"></i>
         </button>
-        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200 mb-2">المسبحة الصوتية الذكية</h1>
-        <p className="text-slate-400 text-sm">اعمل بيدك والبرنامج يعد وراءك</p>
+        <div className="flex-1 text-center">
+          <h1 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200 mb-2 leading-tight">المسبحة الصوتية الذكية</h1>
+          <p className="text-slate-400 text-xs md:text-sm">اعمل بيدك والبرنامج يعد وراءك</p>
+        </div>
+        <div className="w-12 shrink-0"></div> {/* Spacer to keep title perfectly centered */}
       </header>
 
       {errorMsg && (
@@ -541,6 +593,24 @@ export default function App() {
                 ))}
               </div>
             </div>
+
+            <div className="mt-8 border-t border-slate-700 pt-6">
+              <h3 className="text-slate-300 font-bold mb-4 text-sm"><i className="fas fa-file-export ml-2"></i>النسخ الاحتياطي</h3>
+              <div className="flex gap-3">
+                <button 
+                  onClick={handleExportData}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-4 rounded-xl transition-colors text-sm flex justify-center items-center gap-2"
+                >
+                  <i className="fas fa-download"></i> تصدير البيانات
+                </button>
+                <label className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-4 rounded-xl transition-colors text-sm flex justify-center items-center gap-2 cursor-pointer">
+                  <i className="fas fa-upload"></i> استيراد البيانات
+                  <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
+                </label>
+              </div>
+              <p className="text-slate-500 text-xs mt-3 text-center">يمكنك تصدير بياناتك ونقلها إلى جهاز آخر واستيرادها</p>
+            </div>
+            
           </div>
         </div>
       )}
